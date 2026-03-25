@@ -1,6 +1,6 @@
-# GuestFrame MVP
+# EventFrame MVP
 
-GuestFrame is a full-stack MVP for private event photo albums with:
+EventFrame is a full-stack MVP for private event photo albums with:
 
 - unlimited guest joins by link or QR
 - no guest account requirement
@@ -11,7 +11,7 @@ GuestFrame is a full-stack MVP for private event photo albums with:
 
 ## Stack
 
-- `apps/web`: React + Vite PWA-style frontend
+- `apps/web`: React + Vite frontend wrapped with Capacitor for iOS and Android
 - `apps/api`: Cloudflare Worker + D1 + R2 + Durable Objects
 - `packages/shared`: shared types and schemas
 
@@ -69,12 +69,62 @@ make stop
 
 6. Open `http://localhost:5173`
 
+Web is now meant for laptop testing and admin/debug flows. The primary mobile target is the native iOS/Android app generated from `apps/web`.
+
 ## Useful Commands
 
 ```bash
 npm run typecheck
 npm run build
 ```
+
+## Native iOS + Android
+
+The repo now includes native projects in:
+
+- `apps/web/ios`
+- `apps/web/android`
+
+Before syncing or opening the native apps, point the mobile build at a reachable HTTPS API:
+
+```bash
+cp apps/web/.env.native.example apps/web/.env.native.local
+```
+
+Then set:
+
+```bash
+VITE_API_BASE_URL=https://your-worker.your-domain.workers.dev
+```
+
+Sync native assets and plugins:
+
+```bash
+make native-assets
+make native-sync
+```
+
+Or sync a single platform:
+
+```bash
+make native-sync-ios
+make native-sync-android
+```
+
+Open the native projects:
+
+```bash
+make native-open-ios
+make native-open-android
+```
+
+Notes:
+
+- laptop web development still uses `apps/web/.env` and defaults to `http://127.0.0.1:8787`
+- Android emulators fall back to `http://10.0.2.2:8787` when no native API URL is set
+- real devices and App Store / Play Store builds should always use a deployed HTTPS API URL
+- change `appId` in [`apps/web/capacitor.config.ts`](/Users/jketelaar/personal/event-photo-mvp/apps/web/capacitor.config.ts) before store submission if you want your own bundle identifier
+- app icons, splash assets, signing, store screenshots, and release metadata still need to be finalized before submission
 
 ## Product Scope Included
 
@@ -104,6 +154,6 @@ The included `wrangler.toml` already defines the local bindings shape. Replace p
 
 ## Notes
 
-- The frontend is intentionally web-first so guests can join instantly without app-store friction.
-- For native distribution later, this frontend can be wrapped in Capacitor without changing the product flow.
+- The frontend is shared across laptop web testing and native mobile shells.
+- On iOS and Android, camera and photo-library access now go through the Capacitor Camera plugin.
 - Uploaded images are compressed client-side before upload to keep storage costs low.

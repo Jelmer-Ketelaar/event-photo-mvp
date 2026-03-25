@@ -1,25 +1,45 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  createEventSchema,
+  createGuestSessionSchema,
+  type CreateEventInput,
+  type PhotoRecord
+} from "@event-photo/shared";
 import { useEffect, useMemo, useState } from "react";
-import { Routes, Route, useNavigate, useParams, Link } from "react-router-dom";
-import type { CreateEventInput, EventAdmin, EventPublic, PhotoRecord } from "@event-photo/shared";
+import { useForm } from "react-hook-form";
+import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { z } from "zod";
 import { AlbumGrid } from "./components/AlbumGrid";
 import { DownloadGrid } from "./components/DownloadGrid";
 import { SharePanel } from "./components/SharePanel";
 import { UploadComposer } from "./components/UploadComposer";
+import { useAdminAlbumQuery, useAdminEventQuery, useGuestAlbumQuery } from "./hooks/useEventQueries";
+import { useEventSocketInvalidation } from "./hooks/useEventSocketInvalidation";
 import {
   closeAdminEvent,
   createEvent,
   createGuestSession,
   deleteAdminPhoto,
-  fetchAdminEvent,
-  fetchAdminPhotos,
-  fetchGuestEvent,
-  fetchGuestPhotos,
-  getApiBaseUrl,
   toggleAdminUploads,
-  toAbsoluteMediaUrl,
   uploadGuestPhoto
 } from "./lib/api";
 import { downloadPhotosAsZip, downloadPhotosIndividually } from "./lib/downloads";
+import { firstErrorMessage } from "./lib/errors";
+import { detectMobileDevice, formatLongDateTime, toDateTimeLocal } from "./lib/format";
+import { queryKeys } from "./lib/query";
+
+const createEventFormSchema = z.object({
+  name: createEventSchema.shape.name,
+  dateLocal: z
+    .string()
+    .min(1, "Event date is required.")
+    .refine((value) => !Number.isNaN(new Date(value).getTime()), "Use a valid date and time."),
+  description: createEventSchema.shape.description
+});
+
+type CreateEventFormValues = z.infer<typeof createEventFormSchema>;
+type GuestJoinFormValues = z.infer<typeof createGuestSessionSchema>;
 
 export default function App() {
   return (
@@ -35,34 +55,31 @@ export default function App() {
 
 function HomePage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState<CreateEventInput>({
-    name: "",
-    date: new Date().toISOString(),
-    description: ""
-  });
-  const [isSaving, setIsSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsSaving(true);
-    setErrorMessage(null);
-
-    try {
-      const response = await createEvent(form);
+  const createEventMutation = useMutation({
+    mutationFn: createEvent,
+    onSuccess: (response) => {
       navigate(`/events/share/${extractAdminToken(response.adminUrl)}`);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not create the event.");
-    } finally {
-      setIsSaving(false);
     }
+  });
+  const form = useForm<CreateEventFormValues>({
+    resolver: zodResolver(createEventFormSchema),
+    defaultValues: {
+      name: "",
+      dateLocal: toDateTimeLocal(new Date().toISOString()),
+      description: ""
+    }
+  });
+  const errorMessage = firstErrorMessage("Could not create the event.", createEventMutation.error);
+
+  async function handleSubmit(values: CreateEventFormValues) {
+    await createEventMutation.mutateAsync(buildCreateEventInput(values));
   }
 
   return (
     <div className="page-shell">
       <section className="hero">
         <div className="hero-copy">
-          <p className="section-eyebrow">GuestFrame</p>
+          <p className="section-eyebrow">EventFrame</p>
           <h1>Private event albums with instant guest uploads and no participant cap.</h1>
           <p className="lede">
             Create an event, share the QR, let guests shoot with film-style filters, and collect every photo in one private album.
@@ -76,65 +93,40 @@ function HomePage() {
 
         <div className="card create-card">
           <p className="section-eyebrow">Create Event</p>
-          <form className="stack" onSubmit={handleSubmit}>
+          <form className="stack" onSubmit={form.handleSubmit(handleSubmit)}>
             <label>
               Event name
-              <input
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                placeholder="Friday Garden Party"
-                required
-                value={form.name}
-              />
+              <input placeholder="Friday Garden Party" {...form.register("name")} />
+              <FormFieldError message={form.formState.errors.name?.message} />
             </label>
             <label>
               Event date
-              <input
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    date: new Date(event.target.value).toISOString()
-                  }))
-                }
-                required
-                type="datetime-local"
-                value={toDateTimeLocal(form.date)}
-              />
+              <input type="datetime-local" {...form.register("dateLocal")} />
+              <FormFieldError message={form.formState.errors.dateLocal?.message} />
             </label>
             <label>
               Description
-              <textarea
-                onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-                placeholder="Optional note for guests"
-                rows={4}
-                value={form.description ?? ""}
-              />
+              <textarea placeholder="Optional note for guests" rows={4} {...form.register("description")} />
+              <FormFieldError message={form.formState.errors.description?.message} />
             </label>
-            <button disabled={isSaving} type="submit">
-              {isSaving ? "Creating…" : "Create event"}
+            <button disabled={createEventMutation.isPending} type="submit">
+              {createEventMutation.isPending ? "Creating…" : "Create event"}
             </button>
             {errorMessage ? <div className="status-banner danger">{errorMessage}</div> : null}
           </form>
         </div>
       </section>
-
     </div>
   );
 }
 
 function EventSharePage() {
   const { adminToken = "" } = useParams();
-  const [eventData, setEventData] = useState<EventAdmin | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const eventQuery = useAdminEventQuery(adminToken);
+  const eventData = eventQuery.data ?? null;
+  const errorMessage = firstErrorMessage("Could not load the event.", eventQuery.error);
 
-  useEffect(() => {
-    fetchAdminEvent(adminToken)
-      .then(setEventData)
-      .catch((error: Error) => setErrorMessage(error.message))
-      .finally(() => setLoading(false));
-  }, [adminToken]);
-
-  if (loading) {
+  if (eventQuery.isPending) {
     return <LoadingState />;
   }
 
@@ -179,71 +171,67 @@ function EventSharePage() {
 
 function GuestEventPage() {
   const { guestToken = "" } = useParams();
-  const storageKey = useMemo(() => `guestframe:guest-session:${guestToken}`, [guestToken]);
-  const nicknameKey = useMemo(() => `guestframe:guest-nickname:${guestToken}`, [guestToken]);
-  const [eventData, setEventData] = useState<EventPublic | null>(null);
-  const [photos, setPhotos] = useState<PhotoRecord[]>([]);
+  const queryClient = useQueryClient();
+  const guestAlbumQueryKey = useMemo(() => queryKeys.guestAlbum(guestToken), [guestToken]);
+  const storageKey = useMemo(() => `eventframe:guest-session:${guestToken}`, [guestToken]);
+  const nicknameKey = useMemo(() => `eventframe:guest-nickname:${guestToken}`, [guestToken]);
   const [sessionToken, setSessionToken] = useState<string | null>(() => window.localStorage.getItem(storageKey));
   const [nickname, setNickname] = useState(() => window.localStorage.getItem(nicknameKey) ?? "");
-  const [pendingNickname, setPendingNickname] = useState(() => window.localStorage.getItem(nicknameKey) ?? "");
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  async function refresh() {
-    const [eventResponse, photoResponse] = await Promise.all([
-      fetchGuestEvent(guestToken),
-      fetchGuestPhotos(guestToken)
-    ]);
-
-    setEventData(eventResponse);
-    setPhotos(photoResponse.photos);
-  }
-
-  useEffect(() => {
-    refresh()
-      .catch((error: Error) => setErrorMessage(error.message))
-      .finally(() => setLoading(false));
-  }, [guestToken]);
-
-  useEffect(() => {
-    if (!sessionToken) {
-      return;
+  const albumQuery = useGuestAlbumQuery(guestToken);
+  const joinForm = useForm<GuestJoinFormValues>({
+    resolver: zodResolver(createGuestSessionSchema),
+    defaultValues: {
+      nickname: window.localStorage.getItem(nicknameKey) ?? ""
     }
-
-    const socket = openEventSocket(`/api/events/${guestToken}/socket`, refresh);
-    return () => socket?.close();
-  }, [guestToken, sessionToken]);
-
-  async function handleCreateSession(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    try {
-      const session = await createGuestSession(guestToken, pendingNickname);
+  });
+  const joinMutation = useMutation({
+    mutationFn: (values: GuestJoinFormValues) => createGuestSession(guestToken, values.nickname ?? ""),
+    onSuccess: (session) => {
+      const resolvedNickname = session.nickname ?? "";
       setSessionToken(session.sessionToken);
-      setNickname(session.nickname ?? "");
+      setNickname(resolvedNickname);
       window.localStorage.setItem(storageKey, session.sessionToken);
-      window.localStorage.setItem(nicknameKey, session.nickname ?? "");
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not join the event.");
+      window.localStorage.setItem(nicknameKey, resolvedNickname);
     }
-  }
+  });
+  const uploadMutation = useMutation({
+    mutationFn: async (payload: {
+      blob: Blob;
+      fileName: string;
+      filterName: string;
+      width: number;
+      height: number;
+    }) => {
+      if (!sessionToken) {
+        throw new Error("Join the event before uploading.");
+      }
 
-  async function handleUpload(payload: {
-    blob: Blob;
-    fileName: string;
-    filterName: string;
-    width: number;
-    height: number;
-  }) {
-    if (!sessionToken) {
-      throw new Error("Join the event before uploading.");
+      await uploadGuestPhoto(guestToken, sessionToken, payload);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: guestAlbumQueryKey });
     }
+  });
+  const eventData = albumQuery.data?.eventData ?? null;
+  const photos = albumQuery.data?.photos ?? [];
+  const errorMessage = firstErrorMessage(
+    "Could not load the event.",
+    albumQuery.error,
+    joinMutation.error,
+    uploadMutation.error
+  );
 
-    await uploadGuestPhoto(guestToken, sessionToken, payload);
-    await refresh();
-  }
+  useEventSocketInvalidation(`/api/events/${guestToken}/socket`, guestAlbumQueryKey, Boolean(sessionToken));
 
-  if (loading) {
+  useEffect(() => {
+    const storedSessionToken = window.localStorage.getItem(storageKey);
+    const storedNickname = window.localStorage.getItem(nicknameKey) ?? "";
+    setSessionToken(storedSessionToken);
+    setNickname(storedNickname);
+    joinForm.reset({ nickname: storedNickname });
+  }, [guestToken, joinForm, nicknameKey, storageKey]);
+
+  if (albumQuery.isPending) {
     return <LoadingState />;
   }
 
@@ -268,12 +256,15 @@ function GuestEventPage() {
         <section className="card join-card">
           <p className="section-eyebrow">Join Event</p>
           <h2>Add a nickname if you want people to know which photos are yours.</h2>
-          <form className="stack" onSubmit={handleCreateSession}>
+          <form className="stack" onSubmit={joinForm.handleSubmit((values) => joinMutation.mutateAsync(values))}>
             <label>
               Nickname
-              <input onChange={(event) => setPendingNickname(event.target.value)} placeholder="Sam" value={pendingNickname} />
+              <input placeholder="Sam" {...joinForm.register("nickname")} />
+              <FormFieldError message={joinForm.formState.errors.nickname?.message} />
             </label>
-            <button type="submit">Continue</button>
+            <button disabled={joinMutation.isPending} type="submit">
+              {joinMutation.isPending ? "Joining…" : "Continue"}
+            </button>
           </form>
         </section>
       ) : null}
@@ -289,11 +280,13 @@ function GuestEventPage() {
       </div>
 
       <UploadComposer
-        canUpload={Boolean(sessionToken) && eventData.uploadsEnabled}
+        canUpload={Boolean(sessionToken) && eventData.uploadsEnabled && !uploadMutation.isPending}
         joinRequired={!sessionToken}
-        onUpload={handleUpload}
+        onUpload={uploadMutation.mutateAsync}
         uploadsPaused={Boolean(sessionToken) && !eventData.uploadsEnabled}
       />
+
+      {errorMessage ? <div className="status-banner danger">{errorMessage}</div> : null}
 
       <section className="section-block">
         <div className="section-header">
@@ -310,91 +303,52 @@ function GuestEventPage() {
 
 function GuestDownloadsPage() {
   const { guestToken = "" } = useParams();
-  const [eventData, setEventData] = useState<EventPublic | null>(null);
-  const [photos, setPhotos] = useState<PhotoRecord[]>([]);
+  const guestAlbumQueryKey = useMemo(() => queryKeys.guestAlbum(guestToken), [guestToken]);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
   const isMobileDevice = useMemo(() => detectMobileDevice(), []);
+  const albumQuery = useGuestAlbumQuery(guestToken);
+  const downloadMutation = useMutation({
+    mutationFn: async ({
+      eventName,
+      downloadType,
+      photos
+    }: {
+      eventName: string;
+      downloadType: "selection" | "album";
+      photos: PhotoRecord[];
+    }) => {
+      if (downloadType === "selection") {
+        if (isMobileDevice) {
+          await downloadPhotosIndividually(eventName, photos);
+          return;
+        }
 
-  async function refresh() {
-    const [eventResponse, photoResponse] = await Promise.all([
-      fetchGuestEvent(guestToken),
-      fetchGuestPhotos(guestToken)
-    ]);
-
-    setEventData(eventResponse);
-    setPhotos(photoResponse.photos);
-    setSelectedPhotoIds((current) => current.filter((photoId) => photoResponse.photos.some((photo) => photo.id === photoId)));
-  }
-
-  useEffect(() => {
-    refresh()
-      .catch((error: Error) => setErrorMessage(error.message))
-      .finally(() => setLoading(false));
-  }, [guestToken]);
-
-  useEffect(() => {
-    const socket = openEventSocket(`/api/events/${guestToken}/socket`, refresh);
-    return () => socket?.close();
-  }, [guestToken]);
-
-  const selectedPhotos = photos.filter((photo) => selectedPhotoIds.includes(photo.id));
-
-  function toggleSelection(photoId: string) {
-    setSelectedPhotoIds((current) =>
-      current.includes(photoId) ? current.filter((id) => id !== photoId) : [...current, photoId]
-    );
-  }
-
-  function selectAll() {
-    setSelectedPhotoIds(photos.map((photo) => photo.id));
-  }
-
-  function clearSelection() {
-    setSelectedPhotoIds([]);
-  }
-
-  async function handleDownloadSelected() {
-    if (!eventData || selectedPhotos.length === 0) {
-      return;
-    }
-
-    setIsDownloading(true);
-    setErrorMessage(null);
-
-    try {
-      if (isMobileDevice) {
-        await downloadPhotosIndividually(eventData.name, selectedPhotos);
-      } else {
-        await downloadPhotosAsZip(eventData.name, selectedPhotos, "selection");
+        await downloadPhotosAsZip(eventName, photos, "selection");
+        return;
       }
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not download the selected photos.");
-    } finally {
-      setIsDownloading(false);
+
+      await downloadPhotosAsZip(eventName, photos, "album");
     }
-  }
+  });
+  const eventData = albumQuery.data?.eventData ?? null;
+  const photos = albumQuery.data?.photos ?? [];
+  const selectedPhotos = useMemo(
+    () => photos.filter((photo) => selectedPhotoIds.includes(photo.id)),
+    [photos, selectedPhotoIds]
+  );
+  const errorMessage = firstErrorMessage(
+    "Could not load the album.",
+    albumQuery.error,
+    downloadMutation.error
+  );
 
-  async function handleDownloadAllZip() {
-    if (!eventData || photos.length === 0) {
-      return;
-    }
+  useEventSocketInvalidation(`/api/events/${guestToken}/socket`, guestAlbumQueryKey);
 
-    setIsDownloading(true);
-    setErrorMessage(null);
+  useEffect(() => {
+    setSelectedPhotoIds((current) => current.filter((photoId) => photos.some((photo) => photo.id === photoId)));
+  }, [photos]);
 
-    try {
-      await downloadPhotosAsZip(eventData.name, photos, "album");
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not create the ZIP file.");
-    } finally {
-      setIsDownloading(false);
-    }
-  }
-
-  if (loading) {
+  if (albumQuery.isPending) {
     return <LoadingState />;
   }
 
@@ -443,18 +397,24 @@ function GuestDownloadsPage() {
             <span>selected</span>
           </div>
           <div className="page-actions">
-            <button className="ghost" disabled={photos.length === 0} onClick={selectAll} type="button">
+            <button className="ghost" disabled={photos.length === 0} onClick={() => setSelectedPhotoIds(photos.map((photo) => photo.id))} type="button">
               Select all
             </button>
-            <button className="ghost" disabled={selectedPhotoIds.length === 0} onClick={clearSelection} type="button">
+            <button className="ghost" disabled={selectedPhotoIds.length === 0} onClick={() => setSelectedPhotoIds([])} type="button">
               Clear
             </button>
             <button
-              disabled={selectedPhotos.length === 0 || isDownloading}
-              onClick={handleDownloadSelected}
+              disabled={selectedPhotos.length === 0 || downloadMutation.isPending}
+              onClick={() =>
+                downloadMutation.mutateAsync({
+                  eventName: eventData.name,
+                  downloadType: "selection",
+                  photos: selectedPhotos
+                })
+              }
               type="button"
             >
-              {isDownloading
+              {downloadMutation.isPending
                 ? "Preparing…"
                 : isMobileDevice
                   ? "Download selected"
@@ -462,8 +422,14 @@ function GuestDownloadsPage() {
             </button>
             <button
               className="secondary"
-              disabled={photos.length === 0 || isDownloading}
-              onClick={handleDownloadAllZip}
+              disabled={photos.length === 0 || downloadMutation.isPending}
+              onClick={() =>
+                downloadMutation.mutateAsync({
+                  eventName: eventData.name,
+                  downloadType: "album",
+                  photos
+                })
+              }
               type="button"
             >
               Download full album ZIP
@@ -473,7 +439,15 @@ function GuestDownloadsPage() {
 
         {errorMessage ? <div className="status-banner danger">{errorMessage}</div> : null}
 
-        <DownloadGrid onToggle={toggleSelection} photos={photos} selectedPhotoIds={selectedPhotoIds} />
+        <DownloadGrid
+          onToggle={(photoId) =>
+            setSelectedPhotoIds((current) =>
+              current.includes(photoId) ? current.filter((id) => id !== photoId) : [...current, photoId]
+            )
+          }
+          photos={photos}
+          selectedPhotoIds={selectedPhotoIds}
+        />
       </section>
     </div>
   );
@@ -481,98 +455,68 @@ function GuestDownloadsPage() {
 
 function AdminEventPage() {
   const { adminToken = "" } = useParams();
-  const [eventData, setEventData] = useState<EventAdmin | null>(null);
-  const [photos, setPhotos] = useState<PhotoRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
-  const [isClosingEvent, setIsClosingEvent] = useState(false);
-
-  async function refresh() {
-    const [eventResponse, photoResponse] = await Promise.all([
-      fetchAdminEvent(adminToken),
-      fetchAdminPhotos(adminToken)
-    ]);
-
-    setEventData(eventResponse);
-    setPhotos(photoResponse.photos);
-  }
-
-  useEffect(() => {
-    refresh()
-      .catch((error: Error) => setErrorMessage(error.message))
-      .finally(() => setLoading(false));
-  }, [adminToken]);
-
-  useEffect(() => {
-    const socket = openEventSocket(`/api/admin/${adminToken}/socket`, refresh);
-    return () => socket?.close();
-  }, [adminToken]);
-
-  async function handleToggleUploads() {
-    if (!eventData) {
-      return;
+  const queryClient = useQueryClient();
+  const adminAlbumQueryKey = useMemo(() => queryKeys.adminAlbum(adminToken), [adminToken]);
+  const adminEventQueryKey = useMemo(() => queryKeys.adminEvent(adminToken), [adminToken]);
+  const albumQuery = useAdminAlbumQuery(adminToken);
+  const toggleUploadsMutation = useMutation({
+    mutationFn: (enabled: boolean) => toggleAdminUploads(adminToken, enabled),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: adminAlbumQueryKey });
     }
-
-    await toggleAdminUploads(adminToken, !eventData.uploadsEnabled);
-    await refresh();
-  }
-
-  async function handleDelete(photoId: string) {
-    const previousPhotos = photos;
-    setDeletingPhotoId(photoId);
-    setErrorMessage(null);
-    setPhotos((current) => current.filter((photo) => photo.id !== photoId));
-
-    try {
-      await deleteAdminPhoto(adminToken, photoId);
-      await refresh();
-    } catch (error) {
-      setPhotos(previousPhotos);
-      setErrorMessage(error instanceof Error ? error.message : "Could not delete the photo.");
-    } finally {
-      setDeletingPhotoId(null);
+  });
+  const closeEventMutation = useMutation({
+    mutationFn: () => closeAdminEvent(adminToken),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: adminAlbumQueryKey });
+      await queryClient.invalidateQueries({ queryKey: adminEventQueryKey });
     }
-  }
+  });
+  const deletePhotoMutation = useMutation({
+    mutationFn: (photoId: string) => deleteAdminPhoto(adminToken, photoId),
+    onMutate: async (photoId) => {
+      await queryClient.cancelQueries({ queryKey: adminAlbumQueryKey });
 
-  async function handleCloseEvent() {
-    if (!eventData || eventData.endedAt) {
-      return;
+      const previousAlbum = queryClient.getQueryData<typeof albumQuery.data>(adminAlbumQueryKey);
+      queryClient.setQueryData(adminAlbumQueryKey, (current: typeof albumQuery.data) =>
+        current
+          ? {
+              ...current,
+              photos: current.photos.filter((photo) => photo.id !== photoId)
+            }
+          : current
+      );
+
+      return { previousAlbum };
+    },
+    onError: (_error, _photoId, context) => {
+      if (context?.previousAlbum) {
+        queryClient.setQueryData(adminAlbumQueryKey, context.previousAlbum);
+      }
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: adminAlbumQueryKey });
     }
-
-    const confirmed = window.confirm("Close this event? Guests will still be able to view and download photos, but uploads will be disabled.");
-    if (!confirmed) {
-      return;
+  });
+  const downloadMutation = useMutation({
+    mutationFn: async ({ eventName, photos }: { eventName: string; photos: PhotoRecord[] }) => {
+      await downloadPhotosAsZip(eventName, photos, "album");
     }
+  });
+  const eventData = albumQuery.data?.eventData ?? null;
+  const photos = albumQuery.data?.photos ?? [];
+  const errorMessage = firstErrorMessage(
+    "Could not load the organizer dashboard.",
+    albumQuery.error,
+    toggleUploadsMutation.error,
+    closeEventMutation.error,
+    deletePhotoMutation.error,
+    downloadMutation.error
+  );
 
-    setIsClosingEvent(true);
-    setErrorMessage(null);
+  useEventSocketInvalidation(`/api/admin/${adminToken}/socket`, adminAlbumQueryKey);
 
-    try {
-      await closeAdminEvent(adminToken);
-      await refresh();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not close the event.");
-    } finally {
-      setIsClosingEvent(false);
-    }
-  }
-
-  async function handleDownloadAll() {
-    if (!eventData || photos.length === 0) {
-      return;
-    }
-
-    setIsDownloading(true);
-    try {
-      await downloadPhotosAsZip(eventData.name, photos, "album");
-    } finally {
-      setIsDownloading(false);
-    }
-  }
-
-  if (loading) {
+  if (albumQuery.isPending) {
     return <LoadingState />;
   }
 
@@ -594,19 +538,40 @@ function AdminEventPage() {
       />
 
       <div className="admin-toolbar">
-        <button disabled={Boolean(eventData.endedAt)} onClick={handleToggleUploads} type="button">
-          {eventData.uploadsEnabled ? "Pause uploads" : "Resume uploads"}
+        <button
+          disabled={Boolean(eventData.endedAt) || toggleUploadsMutation.isPending}
+          onClick={() => toggleUploadsMutation.mutate(eventData.uploadsEnabled ? false : true)}
+          type="button"
+        >
+          {toggleUploadsMutation.isPending
+            ? "Updating…"
+            : eventData.uploadsEnabled
+              ? "Pause uploads"
+              : "Resume uploads"}
         </button>
         <button
           className="danger"
-          disabled={Boolean(eventData.endedAt) || isClosingEvent}
-          onClick={handleCloseEvent}
+          disabled={Boolean(eventData.endedAt) || closeEventMutation.isPending}
+          onClick={() => {
+            const confirmed = window.confirm(
+              "Close this event? Guests will still be able to view and download photos, but uploads will be disabled."
+            );
+
+            if (confirmed) {
+              closeEventMutation.mutate();
+            }
+          }}
           type="button"
         >
-          {eventData.endedAt ? "Event closed" : isClosingEvent ? "Closing event…" : "Close event"}
+          {eventData.endedAt ? "Event closed" : closeEventMutation.isPending ? "Closing event…" : "Close event"}
         </button>
-        <button className="secondary" disabled={isDownloading || photos.length === 0} onClick={handleDownloadAll} type="button">
-          {isDownloading ? "Preparing ZIP…" : "Download all"}
+        <button
+          className="secondary"
+          disabled={downloadMutation.isPending || photos.length === 0}
+          onClick={() => downloadMutation.mutate({ eventName: eventData.name, photos })}
+          type="button"
+        >
+          {downloadMutation.isPending ? "Preparing ZIP…" : "Download all"}
         </button>
       </div>
 
@@ -625,7 +590,14 @@ function AdminEventPage() {
             <h2>Moderate uploads and keep the whole set.</h2>
           </div>
         </div>
-        <AlbumGrid deletingPhotoId={deletingPhotoId} mode="admin" onDelete={handleDelete} photos={photos} />
+        <AlbumGrid
+          deletingPhotoId={deletePhotoMutation.isPending ? deletePhotoMutation.variables : null}
+          mode="admin"
+          onDelete={async (photoId) => {
+            await deletePhotoMutation.mutateAsync(photoId);
+          }}
+          photos={photos}
+        />
       </section>
     </div>
   );
@@ -642,7 +614,7 @@ function EventHeader(props: {
       <div>
         <p className="section-eyebrow">{props.eyebrow}</p>
         <h1>{props.title}</h1>
-        <p className="lede narrow">{formatLongDate(props.date)}</p>
+        <p className="lede narrow">{formatLongDateTime(props.date)}</p>
         {props.description ? <p className="muted">{props.description}</p> : null}
       </div>
       <Link className="ghost-link" to="/">
@@ -673,46 +645,20 @@ function ErrorState({ message }: { message: string }) {
   );
 }
 
-function openEventSocket(path: string, onRefresh: () => Promise<void>) {
-  const apiBaseUrl = getApiBaseUrl();
-  const socketUrl = new URL(path, apiBaseUrl);
-  socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
-  const socket = new WebSocket(socketUrl);
-
-  socket.addEventListener("message", () => {
-    onRefresh().catch(() => undefined);
-  });
-
-  return socket;
-}
-
-function toDateTimeLocal(value: string) {
-  const date = new Date(value);
-  const timezoneOffset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
-}
-
-function formatLongDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(new Date(value));
-}
-
-function sanitizeFileName(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
-
-function detectMobileDevice() {
-  if (typeof navigator === "undefined") {
-    return false;
+function FormFieldError({ message }: { message: string | undefined }) {
+  if (!message) {
+    return null;
   }
 
-  return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1;
+  return <small className="field-error">{message}</small>;
+}
+
+function buildCreateEventInput(values: CreateEventFormValues): CreateEventInput {
+  return {
+    name: values.name,
+    date: new Date(values.dateLocal).toISOString(),
+    description: values.description ?? ""
+  };
 }
 
 function extractAdminToken(adminUrl: string) {

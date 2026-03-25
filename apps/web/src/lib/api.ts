@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import type {
   CreateEventInput,
   CreateEventResponse,
@@ -6,7 +7,29 @@ import type {
   PhotoRecord
 } from "@event-photo/shared";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "http://127.0.0.1:8787";
+const CONFIGURED_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "");
+const LOCAL_WEB_API_BASE_URL = "http://127.0.0.1:8787";
+const LOCAL_ANDROID_API_BASE_URL = "http://10.0.2.2:8787";
+
+function getDefaultApiBaseUrl() {
+  if (CONFIGURED_API_BASE_URL) {
+    return CONFIGURED_API_BASE_URL;
+  }
+
+  if (!Capacitor.isNativePlatform()) {
+    return LOCAL_WEB_API_BASE_URL;
+  }
+
+  return Capacitor.getPlatform() === "android" ? LOCAL_ANDROID_API_BASE_URL : LOCAL_WEB_API_BASE_URL;
+}
+
+function toNetworkError(error: unknown) {
+  if (!CONFIGURED_API_BASE_URL && Capacitor.isNativePlatform()) {
+    return new Error("Native builds need VITE_API_BASE_URL set to a reachable HTTPS API URL.");
+  }
+
+  return error instanceof Error ? error : new Error("Request failed");
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -17,10 +40,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers.set("content-type", "application/json");
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${getDefaultApiBaseUrl()}${path}`, {
+      ...init,
+      headers
+    });
+  } catch (error) {
+    throw toNetworkError(error);
+  }
 
   if (!response.ok) {
     const errorBody = await safeJson(response);
@@ -39,11 +68,11 @@ async function safeJson(response: Response) {
 }
 
 export function getApiBaseUrl() {
-  return API_BASE_URL;
+  return getDefaultApiBaseUrl();
 }
 
 export function toAbsoluteMediaUrl(path: string) {
-  return path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
+  return path.startsWith("http") ? path : `${getDefaultApiBaseUrl()}${path}`;
 }
 
 export async function createEvent(input: CreateEventInput) {
@@ -85,12 +114,14 @@ export async function uploadGuestPhoto(
   formData.append("width", String(payload.width));
   formData.append("height", String(payload.height));
 
-  const response = await fetch(`${API_BASE_URL}/api/events/${guestToken}/photos`, {
+  const response = await fetch(`${getDefaultApiBaseUrl()}/api/events/${guestToken}/photos`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${sessionToken}`
     },
     body: formData
+  }).catch((error) => {
+    throw toNetworkError(error);
   });
 
   if (!response.ok) {

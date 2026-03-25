@@ -1,5 +1,5 @@
 {
-  "name": "event-photo-mvp",
+  "name": "eventframe",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,14 @@
   "scripts": {
     "dev:web": "npm run dev --workspace @event-photo/web",
     "dev:api": "npm run dev --workspace @event-photo/api",
+    "native:assets": "npm run native:assets --workspace @event-photo/web",
+    "native:sync": "npm run cap:sync --workspace @event-photo/web",
+    "native:sync:ios": "npm run cap:sync:ios --workspace @event-photo/web",
+    "native:sync:android": "npm run cap:sync:android --workspace @event-photo/web",
+    "native:open:ios": "npm run cap:open:ios --workspace @event-photo/web",
+    "native:open:android": "npm run cap:open:android --workspace @event-photo/web",
     "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   }
 }

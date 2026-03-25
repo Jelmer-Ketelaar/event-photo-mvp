@@ -1,6 +1,7 @@
 import { zip } from "fflate";
 import type { PhotoRecord } from "@event-photo/shared";
 import { toAbsoluteMediaUrl } from "./api";
+import { sanitizeFileName } from "./format";
 
 export async function downloadPhotosAsZip(eventName: string, photos: PhotoRecord[], fileLabel = "album") {
   const zipEntries: Record<string, Uint8Array> = {};
@@ -59,8 +60,4 @@ function downloadBlob(blob: Blob, fileName: string) {
 
 function buildPhotoFileName(eventName: string, photo: PhotoRecord) {
   return `${sanitizeFileName(eventName)}-${photo.id}.jpg`;
-}
-
-function sanitizeFileName(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }

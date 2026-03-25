@@ -1,4 +1,4 @@
-.PHONY: ensure-env migrate start stop typecheck build
+.PHONY: ensure-env migrate start stop typecheck build test native-assets native-sync native-sync-ios native-sync-android native-open-ios native-open-android
 
 PID_DIR := .run
 API_PID_FILE := $(PID_DIR)/api.pid
@@ -43,3 +43,24 @@ typecheck:
 
 build:
 	npm run build
+
+test:
+	npm run test
+
+native-assets:
+	npm run native:assets
+
+native-sync:
+	npm run native:sync
+
+native-sync-ios:
+	npm run native:sync:ios
+
+native-sync-android:
+	npm run native:sync:android
+
+native-open-ios:
+	npm run native:open:ios
+
+native-open-android:
+	npm run native:open:android

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FILTER_PRESETS, type FilterId } from "@event-photo/shared";
 import { prepareFilteredImage } from "../lib/image";
+import { pickPhotoFromDevice } from "../lib/media-picker";
+import { isNativeApp } from "../lib/platform";
 
 type UploadComposerProps = {
   canUpload: boolean;
@@ -23,6 +25,7 @@ export function UploadComposer({
 }: UploadComposerProps) {
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
+  const nativeApp = useMemo(() => isNativeApp(), []);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<FilterId>("original");
   const [prepared, setPrepared] = useState<{
@@ -32,6 +35,7 @@ export function UploadComposer({
     previewUrl: string;
   } | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [isPicking, setIsPicking] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -126,6 +130,26 @@ export function UploadComposer({
     event.target.value = "";
   }
 
+  async function handlePickFromDevice(source: "camera" | "gallery") {
+    if (!nativeApp) {
+      return;
+    }
+
+    setIsPicking(true);
+    setErrorMessage(null);
+
+    try {
+      const file = await pickPhotoFromDevice(source);
+      if (file) {
+        setSourceFile(file);
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not access the selected photo.");
+    } finally {
+      setIsPicking(false);
+    }
+  }
+
   return (
     <section className="composer-card">
       <div className="composer-header">
@@ -134,17 +158,30 @@ export function UploadComposer({
           <h2>Take a photo or bring one in from your gallery.</h2>
         </div>
         <div className="composer-actions">
-          <button disabled={!canUpload} onClick={() => cameraInputRef.current?.click()} type="button">
+          <button
+            disabled={!canUpload || isPicking}
+            onClick={() => (nativeApp ? handlePickFromDevice("camera") : cameraInputRef.current?.click())}
+            type="button"
+          >
             Camera
           </button>
-          <button className="secondary" disabled={!canUpload} onClick={() => galleryInputRef.current?.click()} type="button">
+          <button
+            className="secondary"
+            disabled={!canUpload || isPicking}
+            onClick={() => (nativeApp ? handlePickFromDevice("gallery") : galleryInputRef.current?.click())}
+            type="button"
+          >
             Gallery
           </button>
         </div>
       </div>
 
-      <input accept="image/*" capture="environment" hidden onChange={handlePick} ref={cameraInputRef} type="file" />
-      <input accept="image/*" hidden onChange={handlePick} ref={galleryInputRef} type="file" />
+      {!nativeApp ? (
+        <>
+          <input accept="image/*" capture="environment" hidden onChange={handlePick} ref={cameraInputRef} type="file" />
+          <input accept="image/*" hidden onChange={handlePick} ref={galleryInputRef} type="file" />
+        </>
+      ) : null}
 
       {joinRequired ? (
         <div className="status-banner">Join the event first to start uploading.</div>
@@ -179,7 +216,7 @@ export function UploadComposer({
                 </button>
               ))}
             </div>
-            <button disabled={isPreparing || isUploading || !canUpload} onClick={handleUpload} type="button">
+            <button disabled={isPreparing || isPicking || isUploading || !canUpload} onClick={handleUpload} type="button">
               {isUploading ? "Uploading…" : "Upload photo"}
             </button>
             {errorMessage ? <div className="status-banner danger">{errorMessage}</div> : null}

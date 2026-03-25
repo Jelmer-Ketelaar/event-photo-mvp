@@ -1,6 +1,6 @@
 {
-  "name": "GuestFrame",
-  "short_name": "GuestFrame",
+  "name": "EventFrame",
+  "short_name": "EventFrame",
   "description": "Private event albums with instant guest uploads.",
   "start_url": "/",
   "display": "standalone",

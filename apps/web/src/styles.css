@@ -117,10 +117,19 @@ label {
   color: var(--muted);
 }
 
+.field-error {
+  color: #9a3f21;
+  font-size: 0.88rem;
+}
+
 .page-shell {
-  width: min(1160px, calc(100vw - 2rem));
+  width: min(1160px, 100vw);
   margin: 0 auto;
-  padding: 2rem 0 4rem;
+  padding:
+    calc(2rem + env(safe-area-inset-top))
+    max(1rem, calc(1rem + env(safe-area-inset-right)))
+    calc(4rem + env(safe-area-inset-bottom))
+    max(1rem, calc(1rem + env(safe-area-inset-left)));
 }
 
 .center-shell {
