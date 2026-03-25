@@ -80,12 +80,13 @@ function HomePage() {
       <section className="hero">
         <div className="hero-copy">
           <p className="section-eyebrow">EventFrame</p>
-          <h1>Private event albums with instant guest uploads and no participant cap.</h1>
+          <h1>Private event albums with instant guest uploads, unlimited participants, and unlimited photo uploads.</h1>
           <p className="lede">
             Create an event, share the QR, let guests shoot with film-style filters, and collect every photo in one private album.
           </p>
           <div className="hero-pills">
             <span>Unlimited guests</span>
+            <span>Unlimited uploads</span>
             <span>No guest accounts</span>
             <span>Private invite links</span>
           </div>

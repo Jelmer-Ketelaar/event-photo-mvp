@@ -3,6 +3,7 @@
 EventFrame is a full-stack MVP for private event photo albums with:
 
 - unlimited guest joins by link or QR
+- unlimited photo uploads per event
 - no guest account requirement
 - upload from camera or gallery
 - simple film-style filters
@@ -141,6 +142,14 @@ Notes:
 - organizer photo deletion
 - organizer ZIP download
 - scheduled cleanup for expired events
+
+## Upload Policy
+
+- no photo-count cap per guest
+- no photo-count cap per event
+- uploads are only limited by per-file size and storage retention settings
+- default per-file upload limit is `5 MB`
+- default retention is `30 days` after the event date
 
 ## Cloudflare Bindings
 
