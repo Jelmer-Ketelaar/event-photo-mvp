@@ -1,0 +1,30 @@
+name = "event-photo-api"
+main = "src/index.ts"
+compatibility_date = "2026-03-25"
+
+[triggers]
+crons = ["0 * * * *"]
+
+[observability]
+enabled = true
+
+[vars]
+EVENT_RETENTION_DAYS = 30
+MAX_UPLOAD_BYTES = 5242880
+
+[[durable_objects.bindings]]
+name = "EVENT_ROOM"
+class_name = "EventRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["EventRoom"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "event-photo-db"
+database_id = "local-event-photo-db"
+
+[[r2_buckets]]
+binding = "EVENT_MEDIA"
+bucket_name = "event-photo-media"

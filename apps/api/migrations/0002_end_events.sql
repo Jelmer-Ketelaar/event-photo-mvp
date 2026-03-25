@@ -1,0 +1,1 @@
+ALTER TABLE events ADD COLUMN ended_at TEXT;

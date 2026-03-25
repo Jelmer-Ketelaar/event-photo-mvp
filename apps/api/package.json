@@ -1,0 +1,22 @@
+{
+  "name": "@event-photo/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp} wrangler dev",
+    "build": "XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp} wrangler deploy --dry-run",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp} wrangler d1 migrations apply event-photo-db --local"
+  },
+  "dependencies": {
+    "@event-photo/shared": "0.1.0",
+    "hono": "^4.7.4",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250320.0",
+    "typescript": "^5.8.2",
+    "wrangler": "^4.7.0"
+  }
+}
