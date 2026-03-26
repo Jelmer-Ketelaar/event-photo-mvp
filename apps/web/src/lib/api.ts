@@ -10,6 +10,7 @@ import type {
 const CONFIGURED_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "");
 const LOCAL_WEB_API_BASE_URL = "http://127.0.0.1:8787";
 const LOCAL_ANDROID_API_BASE_URL = "http://10.0.2.2:8787";
+const DEV_SERVER_PORTS = new Set(["5173", "4173"]);
 
 function getDefaultApiBaseUrl() {
   if (CONFIGURED_API_BASE_URL) {
@@ -17,10 +18,26 @@ function getDefaultApiBaseUrl() {
   }
 
   if (!Capacitor.isNativePlatform()) {
-    return LOCAL_WEB_API_BASE_URL;
+    return getWebApiBaseUrl();
   }
 
   return Capacitor.getPlatform() === "android" ? LOCAL_ANDROID_API_BASE_URL : LOCAL_WEB_API_BASE_URL;
+}
+
+function getWebApiBaseUrl() {
+  if (typeof window === "undefined") {
+    return LOCAL_WEB_API_BASE_URL;
+  }
+
+  if (isLoopbackHostname(window.location.hostname) || DEV_SERVER_PORTS.has(window.location.port)) {
+    return LOCAL_WEB_API_BASE_URL;
+  }
+
+  return window.location.origin.replace(/\/$/, "");
+}
+
+function isLoopbackHostname(hostname: string) {
+  return ["localhost", "127.0.0.1", "0.0.0.0"].includes(hostname);
 }
 
 function toNetworkError(error: unknown) {

@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp} wrangler dev",
+    "dev:lan": "XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp} wrangler dev --ip 0.0.0.0 --port 8787",
     "build": "XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp} wrangler deploy --dry-run",
+    "deploy": "npm run build --workspace @event-photo/web && XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp} wrangler deploy -c wrangler.production.toml",
+    "deploy:dry-run": "npm run build --workspace @event-photo/web && XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp} wrangler deploy --dry-run -c wrangler.production.toml",
+    "db:migrate:remote": "XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp} wrangler d1 migrations apply event-photo-db --remote -c wrangler.production.toml",
     "typecheck": "tsc --noEmit",
     "db:migrate": "XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp} wrangler d1 migrations apply event-photo-db --local"
   },

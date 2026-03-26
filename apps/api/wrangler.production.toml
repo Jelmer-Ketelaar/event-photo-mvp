@@ -1,0 +1,36 @@
+name = "eventframe"
+main = "src/index.ts"
+compatibility_date = "2026-03-25"
+
+[triggers]
+crons = ["0 * * * *"]
+
+[observability]
+enabled = true
+
+[vars]
+EVENT_RETENTION_DAYS = 30
+MAX_UPLOAD_BYTES = 5242880
+# Optional when your frontend and API run on this same Worker domain.
+# PUBLIC_APP_URL = "https://eventframe.example.com"
+
+[assets]
+directory = "../web/dist"
+not_found_handling = "single-page-application"
+
+[[durable_objects.bindings]]
+name = "EVENT_ROOM"
+class_name = "EventRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["EventRoom"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "event-photo-db"
+database_id = "e48138e6-c385-4875-8da2-011e6e220427"
+
+[[r2_buckets]]
+binding = "EVENT_MEDIA"
+bucket_name = "eventframe-media-production"

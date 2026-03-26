@@ -314,8 +314,20 @@ label {
 
 .copy-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.75rem;
+  align-items: start;
+}
+
+.copy-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.action-link {
+  min-height: 44px;
 }
 
 .preview-grid {
@@ -589,5 +601,14 @@ label {
 
   .copy-row {
     grid-template-columns: 1fr;
+  }
+
+  .copy-actions {
+    width: 100%;
+  }
+
+  .action-link,
+  .copy-actions button {
+    width: 100%;
   }
 }

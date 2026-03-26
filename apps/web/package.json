@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:lan": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc --noEmit && vite build",
     "build:native": "tsc --noEmit && vite build --mode native",
     "native:assets": "CLANG_MODULE_CACHE_PATH=/tmp/eventframe-swift-cache swift scripts/generate_brand_assets.swift",

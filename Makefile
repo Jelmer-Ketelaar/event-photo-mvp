@@ -1,8 +1,10 @@
-.PHONY: ensure-env migrate start stop typecheck build test native-assets native-sync native-sync-ios native-sync-android native-open-ios native-open-android
+.PHONY: ensure-env migrate migrate-remote deploy deploy-dry-run live live-dry-run start start-phone stop typecheck build test native-assets native-sync native-sync-ios native-sync-android native-open-ios native-open-android
 
 PID_DIR := .run
 API_PID_FILE := $(PID_DIR)/api.pid
 WEB_PID_FILE := $(PID_DIR)/web.pid
+LAN_IP ?= $(shell ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
+STACK_SCRIPT := ./scripts/dev-stack.sh
 
 ensure-env:
 	@test -f apps/web/.env || cp apps/web/.env.example apps/web/.env
@@ -11,32 +13,29 @@ ensure-env:
 migrate: ensure-env
 	npm run db:migrate --workspace @event-photo/api
 
+migrate-remote:
+	npm run db:migrate:remote --workspace @event-photo/api
+
+deploy:
+	npm run deploy --workspace @event-photo/api
+
+deploy-dry-run:
+	npm run deploy:dry-run --workspace @event-photo/api
+
+live:
+	npm run live
+
+live-dry-run:
+	npm run live:dry-run
+
 start: migrate
-	@echo "Starting API on http://127.0.0.1:8787 and web on http://localhost:5173"
-	@mkdir -p $(PID_DIR)
-	@npm run dev:api & API_PID=$$!; \
-	echo $$API_PID > $(API_PID_FILE); \
-	npm run dev:web & WEB_PID=$$!; \
-	echo $$WEB_PID > $(WEB_PID_FILE); \
-	trap 'for pid_file in $(API_PID_FILE) $(WEB_PID_FILE); do \
-		if [ -f $$pid_file ]; then \
-			pid=$$(cat $$pid_file); \
-			kill $$pid 2>/dev/null || true; \
-			rm -f $$pid_file; \
-		fi; \
-	done; \
-	rmdir $(PID_DIR) 2>/dev/null || true' INT TERM EXIT; \
-	wait $$API_PID $$WEB_PID
+	@$(STACK_SCRIPT) start
+
+start-phone: migrate
+	@$(STACK_SCRIPT) start-phone "$(LAN_IP)"
 
 stop:
-	@for pid_file in $(API_PID_FILE) $(WEB_PID_FILE); do \
-		if [ -f $$pid_file ]; then \
-			pid=$$(cat $$pid_file); \
-			kill $$pid 2>/dev/null || true; \
-			rm -f $$pid_file; \
-		fi; \
-	done
-	@rmdir $(PID_DIR) 2>/dev/null || true
+	@$(STACK_SCRIPT) stop
 
 typecheck:
 	npm run typecheck

@@ -599,17 +599,32 @@ function eventRowToAdmin(
 }
 
 function getPublicAppUrl(request: Request, configuredUrl?: string) {
-  if (configuredUrl) {
-    return configuredUrl.replace(/\/$/, "");
+  const normalizedConfiguredUrl = configuredUrl?.replace(/\/$/, "");
+  const originHeader = request.headers.get("origin")?.replace(/\/$/, "");
+
+  if (originHeader && (!normalizedConfiguredUrl || isLoopbackUrl(normalizedConfiguredUrl))) {
+    return originHeader;
   }
 
-  const originHeader = request.headers.get("origin");
+  if (normalizedConfiguredUrl) {
+    return normalizedConfiguredUrl;
+  }
+
   if (originHeader) {
-    return originHeader.replace(/\/$/, "");
+    return originHeader;
   }
 
   const url = new URL(request.url);
   return `${url.protocol}//${url.host}`;
+}
+
+function isLoopbackUrl(urlString: string) {
+  try {
+    const url = new URL(urlString);
+    return ["localhost", "127.0.0.1", "0.0.0.0"].includes(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 function createToken() {

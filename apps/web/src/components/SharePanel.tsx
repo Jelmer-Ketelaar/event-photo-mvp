@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { copyText } from "../lib/clipboard";
 
 type SharePanelProps = {
   guestInviteUrl: string;
   adminUrl: string;
 };
 
+type CopyState = "idle" | "success" | "error";
+
 export function SharePanel({ guestInviteUrl, adminUrl }: SharePanelProps) {
   const [qrUrl, setQrUrl] = useState("");
+  const [guestCopyState, setGuestCopyState] = useState<CopyState>("idle");
+  const [adminCopyState, setAdminCopyState] = useState<CopyState>("idle");
 
   useEffect(() => {
     QRCode.toDataURL(guestInviteUrl, {
@@ -19,6 +24,24 @@ export function SharePanel({ guestInviteUrl, adminUrl }: SharePanelProps) {
       }
     }).then(setQrUrl);
   }, [guestInviteUrl]);
+
+  async function handleCopy(kind: "guest" | "admin", value: string) {
+    const copied = await copyText(value);
+
+    if (kind === "guest") {
+      setGuestCopyState(copied ? "success" : "error");
+    } else {
+      setAdminCopyState(copied ? "success" : "error");
+    }
+
+    window.setTimeout(() => {
+      if (kind === "guest") {
+        setGuestCopyState("idle");
+      } else {
+        setAdminCopyState("idle");
+      }
+    }, 1800);
+  }
 
   return (
     <section className="share-panel">
@@ -39,22 +62,44 @@ export function SharePanel({ guestInviteUrl, adminUrl }: SharePanelProps) {
             Guest link
             <div className="copy-row">
               <input readOnly value={guestInviteUrl} />
-              <button onClick={() => navigator.clipboard.writeText(guestInviteUrl)} type="button">
-                Copy
-              </button>
+              <div className="copy-actions">
+                <button onClick={() => handleCopy("guest", guestInviteUrl)} type="button">
+                  {getCopyLabel(guestCopyState)}
+                </button>
+                <a className="ghost-link action-link" href={guestInviteUrl} rel="noreferrer" target="_blank">
+                  Open guest page
+                </a>
+              </div>
             </div>
           </label>
           <label>
             Admin link
             <div className="copy-row">
               <input readOnly value={adminUrl} />
-              <button onClick={() => navigator.clipboard.writeText(adminUrl)} type="button">
-                Copy
-              </button>
+              <div className="copy-actions">
+                <button onClick={() => handleCopy("admin", adminUrl)} type="button">
+                  {getCopyLabel(adminCopyState)}
+                </button>
+                <a className="ghost-link action-link" href={adminUrl} rel="noreferrer" target="_blank">
+                  Open admin page
+                </a>
+              </div>
             </div>
           </label>
         </div>
       </div>
     </section>
   );
+}
+
+function getCopyLabel(copyState: CopyState) {
+  if (copyState === "success") {
+    return "Copied";
+  }
+
+  if (copyState === "error") {
+    return "Copy failed";
+  }
+
+  return "Copy";
 }
