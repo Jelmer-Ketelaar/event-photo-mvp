@@ -104,7 +104,7 @@ app.onError((error, c) => {
 
 app.use("*", async (c, next) => {
   await next();
-  applySecurityHeaders(c.res.headers, c.req.raw, c.env.PUBLIC_APP_URL);
+  c.res = withSecurityHeaders(c.res, c.req.raw, c.env.PUBLIC_APP_URL);
 });
 
 app.use(
@@ -1007,6 +1007,21 @@ function splitConfiguredOrigins(configuredAllowedOrigins?: string) {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function withSecurityHeaders(response: Response, request: Request, configuredAppUrl?: string) {
+  if (response.status === 101) {
+    return response;
+  }
+
+  const headers = new Headers(response.headers);
+  applySecurityHeaders(headers, request, configuredAppUrl);
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
 }
 
 function applySecurityHeaders(headers: Headers, request: Request, configuredAppUrl?: string) {
