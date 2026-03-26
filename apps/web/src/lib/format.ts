@@ -32,6 +32,15 @@ export function sanitizeFileName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+export function formatUploaderLabel(nickname: string | null) {
+  const resolvedNickname = nickname?.trim();
+  return resolvedNickname ? `From ${resolvedNickname}` : "From a guest";
+}
+
+export function formatUploaderFileToken(nickname: string | null) {
+  return sanitizeFileName(nickname?.trim() || "guest") || "guest";
+}
+
 export function detectMobileDevice() {
   if (typeof navigator === "undefined") {
     return false;

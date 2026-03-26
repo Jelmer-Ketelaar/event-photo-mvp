@@ -403,6 +403,7 @@ label {
 }
 
 .photo-card {
+  position: relative;
   border-radius: 28px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.72);
@@ -432,6 +433,27 @@ label {
   width: 100%;
   aspect-ratio: 4 / 5;
   object-fit: cover;
+}
+
+.photo-image-shell {
+  position: relative;
+}
+
+.photo-attribution {
+  position: absolute;
+  left: 0.85rem;
+  bottom: 0.85rem;
+  max-width: calc(100% - 1.7rem);
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(16, 32, 25, 0.78);
+  color: #fff8f2;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .download-card-check {
