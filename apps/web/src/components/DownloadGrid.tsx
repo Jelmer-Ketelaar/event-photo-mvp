@@ -1,6 +1,6 @@
 import type { PhotoRecord } from "@event-photo/shared";
 import { toAbsoluteMediaUrl } from "../lib/api";
-import { formatShortDateTime } from "../lib/format";
+import { formatShortDateTime, formatUploaderLabel } from "../lib/format";
 
 type DownloadGridProps = {
   photos: PhotoRecord[];
@@ -35,9 +35,12 @@ export function DownloadGrid({ photos, selectedPhotoIds, onToggle }: DownloadGri
             <span className="download-card-check" aria-hidden="true">
               {isSelected ? "✓" : ""}
             </span>
-            <img alt={photo.uploaderNickname ?? "Guest upload"} loading="lazy" src={toAbsoluteMediaUrl(photo.imageUrl)} />
+            <div className="photo-image-shell">
+              <img alt={formatUploaderLabel(photo.uploaderNickname)} loading="lazy" src={toAbsoluteMediaUrl(photo.imageUrl)} />
+              <span className="photo-attribution">{formatUploaderLabel(photo.uploaderNickname)}</span>
+            </div>
             <span className="download-card-footer">
-              <strong>{photo.uploaderNickname ?? "Guest"}</strong>
+              <strong>{formatUploaderLabel(photo.uploaderNickname)}</strong>
               <small>{formatShortDateTime(photo.createdAt)}</small>
             </span>
           </button>

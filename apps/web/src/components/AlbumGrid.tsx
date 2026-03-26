@@ -1,6 +1,6 @@
 import type { PhotoRecord } from "@event-photo/shared";
 import { toAbsoluteMediaUrl } from "../lib/api";
-import { formatShortDateTime } from "../lib/format";
+import { formatShortDateTime, formatUploaderLabel } from "../lib/format";
 
 type AlbumGridProps = {
   photos: PhotoRecord[];
@@ -23,10 +23,13 @@ export function AlbumGrid({ photos, mode, deletingPhotoId = null, onDelete }: Al
     <div className="album-grid">
       {photos.map((photo) => (
         <article className="photo-card" key={photo.id}>
-          <img alt={photo.uploaderNickname ?? "Guest upload"} loading="lazy" src={toAbsoluteMediaUrl(photo.imageUrl)} />
+          <div className="photo-image-shell">
+            <img alt={formatUploaderLabel(photo.uploaderNickname)} loading="lazy" src={toAbsoluteMediaUrl(photo.imageUrl)} />
+            <span className="photo-attribution">{formatUploaderLabel(photo.uploaderNickname)}</span>
+          </div>
           <div className="photo-meta">
             <div>
-              <strong>{photo.uploaderNickname ?? "Guest"}</strong>
+              <strong>{formatUploaderLabel(photo.uploaderNickname)}</strong>
               <span>{formatShortDateTime(photo.createdAt)}</span>
             </div>
             <span className="photo-badge">{photo.filterName}</span>

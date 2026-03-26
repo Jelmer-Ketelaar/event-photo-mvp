@@ -1,7 +1,7 @@
 import { zip } from "fflate";
 import type { PhotoRecord } from "@event-photo/shared";
 import { toAbsoluteMediaUrl } from "./api";
-import { sanitizeFileName } from "./format";
+import { formatUploaderFileToken, sanitizeFileName } from "./format";
 
 export async function downloadPhotosAsZip(eventName: string, photos: PhotoRecord[], fileLabel = "album") {
   const zipEntries: Record<string, Uint8Array> = {};
@@ -59,5 +59,5 @@ function downloadBlob(blob: Blob, fileName: string) {
 }
 
 function buildPhotoFileName(eventName: string, photo: PhotoRecord) {
-  return `${sanitizeFileName(eventName)}-${photo.id}.jpg`;
+  return `${sanitizeFileName(eventName)}-${formatUploaderFileToken(photo.uploaderNickname)}-${photo.id}.jpg`;
 }
