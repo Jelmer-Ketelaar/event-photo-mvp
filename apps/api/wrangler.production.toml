@@ -9,24 +9,33 @@ crons = ["0 * * * *"]
 enabled = true
 
 [vars]
+PUBLIC_APP_URL = "https://eventframe.jelmer-ketelaar.workers.dev"
+ALLOWED_ORIGINS = "https://eventframe.jelmer-ketelaar.workers.dev,capacitor://localhost,ionic://localhost"
 EVENT_RETENTION_DAYS = 30
 MAX_UPLOAD_BYTES = 5242880
-# Optional when your frontend and API run on this same Worker domain.
-# PUBLIC_APP_URL = "https://eventframe.example.com"
+# TURNSTILE_SITE_KEY = "replace-with-your-turnstile-site-key"
 
 [assets]
 directory = "../web/dist"
 binding = "ASSETS"
-run_worker_first = ["/api/*"]
+run_worker_first = ["/api/*", "/", "/join/*", "/admin/*", "/events/*", "/downloads/*"]
 not_found_handling = "single-page-application"
 
 [[durable_objects.bindings]]
 name = "EVENT_ROOM"
 class_name = "EventRoom"
 
+[[durable_objects.bindings]]
+name = "SECURITY_GATE"
+class_name = "SecurityGate"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["EventRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["SecurityGate"]
 
 [[d1_databases]]
 binding = "DB"

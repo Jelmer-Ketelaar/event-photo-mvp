@@ -9,16 +9,27 @@ crons = ["0 * * * *"]
 enabled = true
 
 [vars]
+PUBLIC_APP_URL = "http://localhost:5173"
+ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,capacitor://localhost,ionic://localhost"
 EVENT_RETENTION_DAYS = 30
 MAX_UPLOAD_BYTES = 5242880
+# TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 
 [[durable_objects.bindings]]
 name = "EVENT_ROOM"
 class_name = "EventRoom"
 
+[[durable_objects.bindings]]
+name = "SECURITY_GATE"
+class_name = "SecurityGate"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["EventRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["SecurityGate"]
 
 [[d1_databases]]
 binding = "DB"

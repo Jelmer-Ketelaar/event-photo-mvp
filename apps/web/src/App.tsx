@@ -13,8 +13,9 @@ import { z } from "zod";
 import { AlbumGrid } from "./components/AlbumGrid";
 import { DownloadGrid } from "./components/DownloadGrid";
 import { SharePanel } from "./components/SharePanel";
+import { TurnstileWidget } from "./components/TurnstileWidget";
 import { UploadComposer } from "./components/UploadComposer";
-import { useAdminAlbumQuery, useAdminEventQuery, useGuestAlbumQuery } from "./hooks/useEventQueries";
+import { useAdminAlbumQuery, useAdminEventQuery, useGuestAlbumQuery, usePublicConfigQuery } from "./hooks/useEventQueries";
 import { useEventSocketInvalidation } from "./hooks/useEventSocketInvalidation";
 import {
   closeAdminEvent,
@@ -55,10 +56,20 @@ export default function App() {
 
 function HomePage() {
   const navigate = useNavigate();
+  const publicConfigQuery = usePublicConfigQuery();
+  const turnstileSiteKey = publicConfigQuery.data?.turnstileSiteKey ?? null;
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const createEventMutation = useMutation({
     mutationFn: createEvent,
     onSuccess: (response) => {
       navigate(`/events/share/${extractAdminToken(response.adminUrl)}`);
+    },
+    onError: () => {
+      if (turnstileSiteKey) {
+        setTurnstileToken("");
+        setTurnstileResetKey((current) => current + 1);
+      }
     }
   });
   const form = useForm<CreateEventFormValues>({
@@ -72,7 +83,10 @@ function HomePage() {
   const errorMessage = firstErrorMessage("Could not create the event.", createEventMutation.error);
 
   async function handleSubmit(values: CreateEventFormValues) {
-    await createEventMutation.mutateAsync(buildCreateEventInput(values));
+    await createEventMutation.mutateAsync({
+      ...buildCreateEventInput(values),
+      turnstileToken
+    });
   }
 
   return (
@@ -110,7 +124,18 @@ function HomePage() {
               <textarea placeholder="Optional note for guests" rows={4} {...form.register("description")} />
               <FormFieldError message={form.formState.errors.description?.message} />
             </label>
-            <button disabled={createEventMutation.isPending} type="submit">
+            {turnstileSiteKey ? (
+              <TurnstileWidget
+                action="create-event"
+                onTokenChange={setTurnstileToken}
+                resetKey={turnstileResetKey}
+                siteKey={turnstileSiteKey}
+              />
+            ) : null}
+            <button
+              disabled={publicConfigQuery.isPending || createEventMutation.isPending || Boolean(turnstileSiteKey && !turnstileToken)}
+              type="submit"
+            >
               {createEventMutation.isPending ? "Creating…" : "Create event"}
             </button>
             {errorMessage ? <div className="status-banner danger">{errorMessage}</div> : null}
@@ -173,12 +198,16 @@ function EventSharePage() {
 function GuestEventPage() {
   const { guestToken = "" } = useParams();
   const queryClient = useQueryClient();
+  const publicConfigQuery = usePublicConfigQuery();
   const guestAlbumQueryKey = useMemo(() => queryKeys.guestAlbum(guestToken), [guestToken]);
   const storageKey = useMemo(() => `eventframe:guest-session:${guestToken}`, [guestToken]);
   const nicknameKey = useMemo(() => `eventframe:guest-nickname:${guestToken}`, [guestToken]);
   const [sessionToken, setSessionToken] = useState<string | null>(() => window.localStorage.getItem(storageKey));
   const [nickname, setNickname] = useState(() => window.localStorage.getItem(nicknameKey) ?? "");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const albumQuery = useGuestAlbumQuery(guestToken);
+  const turnstileSiteKey = publicConfigQuery.data?.turnstileSiteKey ?? null;
   const joinForm = useForm<GuestJoinFormValues>({
     resolver: zodResolver(createGuestSessionSchema),
     defaultValues: {
@@ -186,13 +215,19 @@ function GuestEventPage() {
     }
   });
   const joinMutation = useMutation({
-    mutationFn: (values: GuestJoinFormValues) => createGuestSession(guestToken, values.nickname ?? ""),
+    mutationFn: (values: GuestJoinFormValues) => createGuestSession(guestToken, values.nickname ?? "", turnstileToken),
     onSuccess: (session) => {
       const resolvedNickname = session.nickname ?? "";
       setSessionToken(session.sessionToken);
       setNickname(resolvedNickname);
       window.localStorage.setItem(storageKey, session.sessionToken);
       window.localStorage.setItem(nicknameKey, resolvedNickname);
+    },
+    onError: () => {
+      if (turnstileSiteKey) {
+        setTurnstileToken("");
+        setTurnstileResetKey((current) => current + 1);
+      }
     }
   });
   const uploadMutation = useMutation({
@@ -263,7 +298,18 @@ function GuestEventPage() {
               <input placeholder="Sam" {...joinForm.register("nickname")} />
               <FormFieldError message={joinForm.formState.errors.nickname?.message} />
             </label>
-            <button disabled={joinMutation.isPending} type="submit">
+            {turnstileSiteKey ? (
+              <TurnstileWidget
+                action="join-event"
+                onTokenChange={setTurnstileToken}
+                resetKey={turnstileResetKey}
+                siteKey={turnstileSiteKey}
+              />
+            ) : null}
+            <button
+              disabled={publicConfigQuery.isPending || joinMutation.isPending || Boolean(turnstileSiteKey && !turnstileToken)}
+              type="submit"
+            >
               {joinMutation.isPending ? "Joining…" : "Continue"}
             </button>
           </form>

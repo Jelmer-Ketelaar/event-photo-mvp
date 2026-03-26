@@ -4,7 +4,8 @@ import type {
   CreateEventResponse,
   EventAdmin,
   EventPublic,
-  PhotoRecord
+  PhotoRecord,
+  PublicConfig
 } from "@event-photo/shared";
 
 const CONFIGURED_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "");
@@ -107,6 +108,10 @@ export async function createEvent(input: CreateEventInput) {
   });
 }
 
+export async function fetchPublicConfig() {
+  return request<PublicConfig>("/api/public-config");
+}
+
 export async function fetchGuestEvent(guestToken: string) {
   return request<EventPublic>(`/api/events/${guestToken}`);
 }
@@ -115,10 +120,10 @@ export async function fetchGuestPhotos(guestToken: string) {
   return request<{ photos: PhotoRecord[] }>(`/api/events/${guestToken}/photos`);
 }
 
-export async function createGuestSession(guestToken: string, nickname: string) {
+export async function createGuestSession(guestToken: string, nickname: string, turnstileToken?: string) {
   return request<{ sessionToken: string; nickname: string | null }>(`/api/events/${guestToken}/sessions`, {
     method: "POST",
-    body: JSON.stringify({ nickname })
+    body: JSON.stringify({ nickname, turnstileToken })
   });
 }
 
