@@ -277,6 +277,14 @@ Recommended Cloudflare API token scopes are documented in the official Cloudflar
 
 Once those two secrets are present, every push to `main` updates the live site automatically.
 
+## Branch Workflow
+
+- `main` is the protected production branch
+- `develop` is available as the protected integration branch for reviewed work
+- open pull requests into `develop` for normal feature work
+- merge reviewed release-ready changes from `develop` into `main` to trigger production deploys
+- GitHub uses [pull_request_template.md](/Users/jketelaar/personal/event-photo-mvp/.github/pull_request_template.md) to keep reviews consistent
+
 ## Security Notes
 
 - production CORS is restricted to the configured app origin and native Capacitor origins
