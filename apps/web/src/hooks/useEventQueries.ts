@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import type { EventAdmin, EventPublic, PhotoRecord } from "@event-photo/shared";
-import { fetchAdminEvent, fetchAdminPhotos, fetchGuestEvent, fetchGuestPhotos } from "../lib/api";
+import type { EventAdmin, EventPublic, PhotoRecord, PublicConfig } from "@event-photo/shared";
+import { fetchAdminEvent, fetchAdminPhotos, fetchGuestEvent, fetchGuestPhotos, fetchPublicConfig } from "../lib/api";
 import { queryKeys } from "../lib/query";
 
 export type GuestAlbumData = {
@@ -12,6 +12,13 @@ export type AdminAlbumData = {
   eventData: EventAdmin;
   photos: PhotoRecord[];
 };
+
+export function usePublicConfigQuery() {
+  return useQuery({
+    queryKey: queryKeys.publicConfig,
+    queryFn: (): Promise<PublicConfig> => fetchPublicConfig()
+  });
+}
 
 export function useAdminEventQuery(adminToken: string) {
   return useQuery({

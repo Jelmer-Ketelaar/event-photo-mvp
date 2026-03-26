@@ -186,6 +186,16 @@ That single command will:
 - build the frontend
 - deploy the Worker with the frontend assets and API on one public URL
 
+Before first production use, also set Worker secrets for token signing and optional Turnstile verification:
+
+```bash
+cd apps/api
+npx wrangler secret put TOKEN_SIGNING_SECRET -c wrangler.production.toml
+npx wrangler secret put TURNSTILE_SECRET_KEY -c wrangler.production.toml
+```
+
+If you want Turnstile enabled in production, also set a real `TURNSTILE_SITE_KEY` in [`apps/api/wrangler.production.toml`](/Users/jketelaar/personal/event-photo-mvp/apps/api/wrangler.production.toml).
+
 If you want to verify everything without deploying yet:
 
 ```bash
@@ -210,19 +220,27 @@ Manual deploy flow if you want more control:
 
 4. If you want a custom domain, optionally set `PUBLIC_APP_URL` in [`apps/api/wrangler.production.toml`](/Users/jketelaar/personal/event-photo-mvp/apps/api/wrangler.production.toml) to that final HTTPS URL.
 
-5. Apply the remote database migration:
+5. Set Worker secrets:
+
+   ```bash
+   cd apps/api
+   npx wrangler secret put TOKEN_SIGNING_SECRET -c wrangler.production.toml
+   npx wrangler secret put TURNSTILE_SECRET_KEY -c wrangler.production.toml
+   ```
+
+6. Apply the remote database migration:
 
    ```bash
    make migrate-remote
    ```
 
-6. Dry-run the full production deploy:
+7. Dry-run the full production deploy:
 
    ```bash
    make deploy-dry-run
    ```
 
-7. Deploy the web app and API together:
+8. Deploy the web app and API together:
 
    ```bash
    make deploy
@@ -258,6 +276,15 @@ Recommended Cloudflare API token scopes are documented in the official Cloudflar
 - r2 write
 
 Once those two secrets are present, every push to `main` updates the live site automatically.
+
+## Security Notes
+
+- production CORS is restricted to the configured app origin and native Capacitor origins
+- security headers are added to HTML and API responses
+- rate limiting protects event creation, guest joins, and uploads
+- guest invite tokens are no longer stored in plain text in D1
+- Turnstile is supported for create and join flows when `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are configured
+- `main` is protected on GitHub and intended to be updated through pull requests only
 
 ## Product Scope Included
 

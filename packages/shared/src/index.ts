@@ -39,11 +39,13 @@ export type FilterId = FilterPreset["id"];
 export const createEventSchema = z.object({
   name: z.string().trim().min(2).max(120),
   date: z.string().datetime(),
-  description: z.string().trim().max(500).optional().or(z.literal(""))
+  description: z.string().trim().max(500).optional().or(z.literal("")),
+  turnstileToken: z.string().trim().max(2048).optional().or(z.literal(""))
 });
 
 export const createGuestSessionSchema = z.object({
-  nickname: z.string().trim().max(40).optional().or(z.literal(""))
+  nickname: z.string().trim().max(40).optional().or(z.literal("")),
+  turnstileToken: z.string().trim().max(2048).optional().or(z.literal(""))
 });
 
 export const toggleUploadsSchema = z.object({
@@ -79,6 +81,10 @@ export const eventAdminSchema = eventPublicSchema.extend({
 
 export const createEventResponseSchema = eventAdminSchema;
 
+export const publicConfigSchema = z.object({
+  turnstileSiteKey: z.string().nullable()
+});
+
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type CreateGuestSessionInput = z.infer<typeof createGuestSessionSchema>;
 export type ToggleUploadsInput = z.infer<typeof toggleUploadsSchema>;
@@ -86,3 +92,4 @@ export type PhotoRecord = z.infer<typeof photoSchema>;
 export type EventPublic = z.infer<typeof eventPublicSchema>;
 export type EventAdmin = z.infer<typeof eventAdminSchema>;
 export type CreateEventResponse = z.infer<typeof createEventResponseSchema>;
+export type PublicConfig = z.infer<typeof publicConfigSchema>;

@@ -326,6 +326,15 @@ label {
   gap: 0.65rem;
 }
 
+.turnstile-block {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.turnstile-widget {
+  min-height: 66px;
+}
+
 .action-link {
   min-height: 44px;
 }

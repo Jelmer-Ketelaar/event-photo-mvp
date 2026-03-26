@@ -11,6 +11,7 @@ export const queryClient = new QueryClient({
 });
 
 export const queryKeys = {
+  publicConfig: ["public-config"] as const,
   adminEvent: (adminToken: string) => ["admin-event", adminToken] as const,
   adminAlbum: (adminToken: string) => ["admin-album", adminToken] as const,
   guestAlbum: (guestToken: string) => ["guest-album", guestToken] as const
