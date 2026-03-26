@@ -236,6 +236,29 @@ Notes:
 - phone QR codes and share links now use the active public/LAN origin instead of falling back to `localhost`
 - if you bind a custom domain to the Worker, that same domain becomes the guest site, admin site, and API host
 
+## Auto Deploy On Push To `main`
+
+This repo now includes a GitHub Actions workflow in [deploy-main.yml](/Users/jketelaar/personal/event-photo-mvp/.github/workflows/deploy-main.yml). Every push to `main` will:
+
+- install dependencies
+- run `npm run typecheck`
+- run `npm run test`
+- apply remote D1 migrations
+- deploy the Worker and web assets
+
+Before it can work, add these repository secrets in GitHub:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+Recommended Cloudflare API token scopes are documented in the official Cloudflare Workers GitHub Actions docs:
+- account read
+- workers write
+- d1 write
+- r2 write
+
+Once those two secrets are present, every push to `main` updates the live site automatically.
+
 ## Product Scope Included
 
 - event creation with name, date, and description

@@ -13,15 +13,23 @@ const LOCAL_ANDROID_API_BASE_URL = "http://10.0.2.2:8787";
 const DEV_SERVER_PORTS = new Set(["5173", "4173"]);
 
 function getDefaultApiBaseUrl() {
+  if (Capacitor.isNativePlatform()) {
+    if (CONFIGURED_API_BASE_URL) {
+      return CONFIGURED_API_BASE_URL;
+    }
+
+    return Capacitor.getPlatform() === "android" ? LOCAL_ANDROID_API_BASE_URL : LOCAL_WEB_API_BASE_URL;
+  }
+
+  if (!import.meta.env.DEV && typeof window !== "undefined") {
+    return window.location.origin.replace(/\/$/, "");
+  }
+
   if (CONFIGURED_API_BASE_URL) {
     return CONFIGURED_API_BASE_URL;
   }
 
-  if (!Capacitor.isNativePlatform()) {
-    return getWebApiBaseUrl();
-  }
-
-  return Capacitor.getPlatform() === "android" ? LOCAL_ANDROID_API_BASE_URL : LOCAL_WEB_API_BASE_URL;
+  return getWebApiBaseUrl();
 }
 
 function getWebApiBaseUrl() {

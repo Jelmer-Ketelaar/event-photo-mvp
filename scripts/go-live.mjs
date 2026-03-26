@@ -27,7 +27,7 @@ if (isDryRun) {
 }
 
 runCommand("npm", ["run", "db:migrate:remote", "--workspace", "@event-photo/api"], { cwd: repoRoot });
-runCommand("npm", ["run", "deploy", "--workspace", "@event-photo/api"], { cwd: repoRoot });
+deployWorker();
 
 function ensureWranglerAuth() {
   const result = runCommand("npx", ["wrangler", "whoami", "--json"], {
@@ -75,14 +75,21 @@ function findDatabaseByName(name) {
 
 function ensureConfigDatabaseId(databaseId) {
   const currentConfig = readFileSync(productionConfigPath, "utf8");
+  const existingDatabaseId = currentConfig.match(/^database_id = "([^"]+)"$/m)?.[1];
+
+  if (!existingDatabaseId) {
+    throw new Error("Could not find `database_id` in wrangler.production.toml.");
+  }
+
+  if (existingDatabaseId === databaseId) {
+    logInfo(`wrangler.production.toml already points to D1 database ID ${databaseId}`);
+    return;
+  }
+
   const updatedConfig = currentConfig.replace(
     /^database_id = "([^"]+)"$/m,
     `database_id = "${databaseId}"`
   );
-
-  if (updatedConfig === currentConfig) {
-    throw new Error("Could not update the production Wrangler config with the D1 database ID.");
-  }
 
   writeFileSync(productionConfigPath, updatedConfig);
   logInfo(`Updated wrangler.production.toml with D1 database ID ${databaseId}`);
@@ -130,6 +137,25 @@ function ensureR2Bucket(name) {
   throw new Error(createResult.stderr || createResult.stdout || `Could not create R2 bucket ${name}.`);
 }
 
+function deployWorker() {
+  const result = runCommand("npm", ["run", "deploy", "--workspace", "@event-photo/api"], {
+    cwd: repoRoot,
+    allowFailure: true
+  });
+
+  if (result.status === 0) {
+    return;
+  }
+
+  if (isWorkersSubdomainMissingResult(result)) {
+    throw new Error(
+      "Cloudflare Workers is not fully initialized for this account yet. Open the Workers section once in the Cloudflare Dashboard to create your workers.dev subdomain, then run `make live` again."
+    );
+  }
+
+  throw new Error(result.stderr || result.stdout || "Worker deployment failed.");
+}
+
 function runCommand(command, args, options = {}) {
   const { cwd, allowFailure = false } = options;
   const result = spawnSync(command, args, {
@@ -167,6 +193,10 @@ function readRequiredMatch(source, pattern, label) {
 
 function isR2NotEnabledResult(result) {
   return `${result.stdout}\n${result.stderr}`.includes("[code: 10042]");
+}
+
+function isWorkersSubdomainMissingResult(result) {
+  return `${result.stdout}\n${result.stderr}`.includes("[code: 10063]");
 }
 
 function logStep(message) {
