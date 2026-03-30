@@ -32,7 +32,7 @@ export async function downloadPhotosAsZip(
   }
 
   const archive = await createZipArchive(zipEntries);
-  const zipBlob = new Blob([archive.buffer.slice(archive.byteOffset, archive.byteOffset + archive.byteLength)], { type: MIME_TYPES.ZIP });
+  const zipBlob = new Blob([archive], { type: MIME_TYPES.ZIP });
   
   downloadBlob(zipBlob, `${sanitizeFileName(eventName)}-${fileLabel}.zip`);
 }
@@ -47,7 +47,7 @@ export async function downloadPhotosIndividually(
 ): Promise<void> {
   for (const [index, photo] of photos.entries()) {
     const bytes = await fetchPhotoBytes(photo);
-    const blob = new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)], { type: MIME_TYPES.JPEG });
+    const blob = new Blob([bytes], { type: MIME_TYPES.JPEG });
     downloadBlob(blob, buildPhotoFileName(eventName, photo));
 
     // Throttle downloads to avoid browser issues
