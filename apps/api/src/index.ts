@@ -80,18 +80,33 @@ type RateLimitRule = {
   windowMs: number;
 };
 
+/** Time constants for readability */
+const TIME = {
+  MINUTE_MS: 60 * 1_000,
+  HOUR_MS: 60 * 60 * 1_000,
+  DAY_MS: 24 * 60 * 60 * 1_000
+} as const;
+
+/** Default configuration values */
+const DEFAULTS = {
+  EVENT_RETENTION_DAYS: 30,
+  MAX_UPLOAD_BYTES: 5 * 1024 * 1024,
+  CACHE_CONTROL_PHOTO: "private, max-age=300"
+} as const;
+
+/** Rate limiting configuration */
 const RATE_LIMITS = {
   createEvent: {
     limit: 8,
-    windowMs: 10 * 60 * 1_000
+    windowMs: 10 * TIME.MINUTE_MS
   },
   joinEvent: {
     limit: 20,
-    windowMs: 10 * 60 * 1_000
+    windowMs: 10 * TIME.MINUTE_MS
   },
   uploadPhoto: {
     limit: 120,
-    windowMs: 10 * 60 * 1_000
+    windowMs: 10 * TIME.MINUTE_MS
   }
 } satisfies Record<string, RateLimitRule>;
 
@@ -150,8 +165,8 @@ app.post("/api/events", async (c) => {
   const guestToken = await createSignedGuestToken(eventId, tokenSigningSecret);
   const adminToken = createToken();
   const now = new Date();
-  const retentionDays = Number(c.env.EVENT_RETENTION_DAYS ?? "30");
-  const expiresAt = new Date(new Date(parsed.data.date).getTime() + retentionDays * 24 * 60 * 60 * 1000);
+  const retentionDays = Number(c.env.EVENT_RETENTION_DAYS ?? DEFAULTS.EVENT_RETENTION_DAYS);
+  const expiresAt = new Date(new Date(parsed.data.date).getTime() + retentionDays * TIME.DAY_MS);
   const guestTokenHash = await sha256Hex(guestToken);
 
   await c.env.DB.prepare(
@@ -299,7 +314,7 @@ app.post("/api/events/:guestToken/photos", async (c) => {
     return c.json({ error: "Unsupported filter." }, 400);
   }
 
-  const maxUploadBytes = Number(c.env.MAX_UPLOAD_BYTES ?? `${5 * 1024 * 1024}`);
+  const maxUploadBytes = Number(c.env.MAX_UPLOAD_BYTES ?? DEFAULTS.MAX_UPLOAD_BYTES);
   if (file.size > maxUploadBytes) {
     return c.json({ error: "File exceeds the upload limit." }, 413);
   }
@@ -857,7 +872,7 @@ async function streamPhoto(bucket: R2Bucket, photo: PhotoRow) {
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set("etag", object.httpEtag);
-  headers.set("cache-control", "private, max-age=300");
+  headers.set("cache-control", DEFAULTS.CACHE_CONTROL_PHOTO);
 
   return new Response(object.body, {
     headers

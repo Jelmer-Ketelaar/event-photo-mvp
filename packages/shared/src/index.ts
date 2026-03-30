@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+/**
+ * Available photo filter presets with their CSS filter configurations.
+ * Each preset provides a distinct visual style for uploaded photos.
+ */
 export const FILTER_PRESETS = [
   {
     id: "original",
@@ -36,6 +40,7 @@ export const FILTER_PRESETS = [
 export type FilterPreset = (typeof FILTER_PRESETS)[number];
 export type FilterId = FilterPreset["id"];
 
+/** Schema for creating a new event */
 export const createEventSchema = z.object({
   name: z.string().trim().min(2).max(120),
   date: z.string().datetime(),
@@ -43,15 +48,18 @@ export const createEventSchema = z.object({
   turnstileToken: z.string().trim().max(2048).optional().or(z.literal(""))
 });
 
+/** Schema for creating a guest session to join an event */
 export const createGuestSessionSchema = z.object({
   nickname: z.string().trim().max(40).optional().or(z.literal("")),
   turnstileToken: z.string().trim().max(2048).optional().or(z.literal(""))
 });
 
+/** Schema for toggling event upload permissions */
 export const toggleUploadsSchema = z.object({
   enabled: z.boolean()
 });
 
+/** Schema representing a photo record in the album */
 export const photoSchema = z.object({
   id: z.string(),
   eventId: z.string(),
@@ -64,6 +72,7 @@ export const photoSchema = z.object({
   imageUrl: z.string()
 });
 
+/** Schema for public event data visible to guests */
 export const eventPublicSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -74,6 +83,7 @@ export const eventPublicSchema = z.object({
   expiresAt: z.string()
 });
 
+/** Schema for admin event data with management URLs */
 export const eventAdminSchema = eventPublicSchema.extend({
   guestInviteUrl: z.string(),
   adminUrl: z.string()

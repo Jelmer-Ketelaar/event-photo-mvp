@@ -1,9 +1,11 @@
 import { Capacitor } from "@capacitor/core";
 
-export function isNativeApp() {
+/** Checks if running as a native app (iOS/Android) vs web browser */
+export function isNativeApp(): boolean {
   return Capacitor.isNativePlatform();
 }
 
-export function getNativePlatform() {
+/** Returns the current platform: "ios", "android", or "web" */
+export function getNativePlatform(): string {
   return Capacitor.getPlatform();
 }

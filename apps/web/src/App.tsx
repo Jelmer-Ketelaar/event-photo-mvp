@@ -587,7 +587,7 @@ function AdminEventPage() {
       <div className="admin-toolbar">
         <button
           disabled={Boolean(eventData.endedAt) || toggleUploadsMutation.isPending}
-          onClick={() => toggleUploadsMutation.mutate(eventData.uploadsEnabled ? false : true)}
+          onClick={() => toggleUploadsMutation.mutate(!eventData.uploadsEnabled)}
           type="button"
         >
           {toggleUploadsMutation.isPending
