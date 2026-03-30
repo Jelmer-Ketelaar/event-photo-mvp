@@ -26,5 +26,9 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "dependencies": {
+    "@event-photo/shared": "^0.1.0",
+    "fflate": "^0.8.2"
   }
 }
