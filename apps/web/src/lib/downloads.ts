@@ -71,7 +71,7 @@ async function createZipArchive(entries: Record<string, Uint8Array>): Promise<Ui
   });
 }
 
-/** Fetches photo bytes from the API */
+/** Fetches photo bytes from the API and ensures ArrayBuffer backing */
 async function fetchPhotoBytes(photo: PhotoRecord): Promise<Uint8Array> {
   const response = await fetch(toAbsoluteMediaUrl(photo.imageUrl));
   
@@ -79,7 +79,17 @@ async function fetchPhotoBytes(photo: PhotoRecord): Promise<Uint8Array> {
     throw new Error("Could not download one or more photos.");
   }
 
-  return new Uint8Array(await response.arrayBuffer());
+  const buffer = await response.arrayBuffer();
+  
+  // Ensure we have a regular ArrayBuffer (not SharedArrayBuffer)
+  // for Blob compatibility by creating a copy if needed
+  if (buffer instanceof SharedArrayBuffer) {
+    const regularBuffer = new ArrayBuffer(buffer.byteLength);
+    new Uint8Array(regularBuffer).set(new Uint8Array(buffer));
+    return new Uint8Array(regularBuffer);
+  }
+  
+  return new Uint8Array(buffer);
 }
 
 /** Triggers a file download via a temporary anchor element */
